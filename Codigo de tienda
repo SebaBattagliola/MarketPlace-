@@ -1,0 +1,94 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.23;
+
+//MarketPlace de objetos
+
+contract Tienda {
+    address public owner;
+
+    struct Producto {
+        uint id;
+        string nombre;
+        string descripcion;
+        uint precio;
+        address vendedor;
+        bool pausado;
+        uint meGustas;
+    }
+
+    Producto[] public productos;
+    mapping(uint => address[]) public interesados;
+
+    event ProductoPublicado(uint id, string nombre, uint precio, address vendedor);
+    event ProductoPausado(uint id);
+    event ProductoReanudado(uint id);
+    event ProductoDadoDeBaja(uint id);
+    event OfertaHecha(uint id, uint nuevaOferta, address ofertante);
+    event MeGustaPuesto(uint id, address usuario);
+
+    modifier soloOwner() {
+        require(msg.sender == owner, "Solo el propietario puede realizar esta accion.");
+        _;
+    }
+
+    modifier soloVendedor(uint id) {
+        require(msg.sender == productos[id].vendedor, "Solo el vendedor del producto puede realizar esta accion.");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function publicarProducto(string memory _nombre, string memory _descripcion, uint _precio) public {
+        productos.push(Producto({
+            id: productos.length,
+            nombre: _nombre,
+            descripcion: _descripcion,
+            precio: _precio,
+            vendedor: msg.sender,
+            pausado: false,
+            meGustas: 0
+        }));
+        emit ProductoPublicado(productos.length - 1, _nombre, _precio, msg.sender);
+    }
+
+    function pausarProducto(uint _id) public soloVendedor(_id) {
+        productos[_id].pausado = true;
+        emit ProductoPausado(_id);
+    }
+
+    function reanudarProducto(uint _id) public soloVendedor(_id) {
+        productos[_id].pausado = false;
+        emit ProductoReanudado(_id);
+    }
+
+    function darDeBajaProducto(uint _id) public soloVendedor(_id) {
+        delete productos[_id];
+        emit ProductoDadoDeBaja(_id);
+    }
+
+    function hacerOferta(uint _id) public payable {
+        require(!productos[_id].pausado, "El producto esta pausado.");
+        require(msg.value >= productos[_id].precio, "La oferta debe ser mayor o igual al precio del producto.");
+        payable(productos[_id].vendedor).transfer(msg.value);
+        emit OfertaHecha(_id, msg.value, msg.sender);
+    }
+
+    function ponerMeGusta(uint _id) public {
+        productos[_id].meGustas += 1;
+        emit MeGustaPuesto(_id, msg.sender);
+    }
+
+    function mostrarInteres(uint _id) public {
+        interesados[_id].push(msg.sender);
+    }
+
+    function verInteresados(uint _id) public view returns (address[] memory) {
+        return interesados[_id];
+    }
+
+    function verProducto(uint _id) public view returns (Producto memory) {
+        return productos[_id];
+    }
+}
